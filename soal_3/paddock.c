@@ -14,10 +14,11 @@
 
 /*  
     Soal_3 paddock.c
-    VERSION 1 - no logs 
+    VERSION 2 - tidied up
     Amoes Noland 5027231028
 */
 
+// Global definitions
 #define PORT       8080
 #define MAX_BUFFER 1024
 
@@ -73,6 +74,7 @@ int main(){
         exit(EXIT_FAILURE);
     }
 
+    // DEBUGGING
     printf("Server listening on port %d\n", PORT);
 
     // Define work variables
@@ -93,27 +95,29 @@ int main(){
             continue;
         }
 
+        // DEBUGGING
         printf("Accepted %s:%d\n", inet_ntoa(client_address.sin_addr),
                                    ntohs(client_address.sin_port));
 
     while(1){
-        // Read buffer for command
+        // DEBUGGING
         printf("Waiting for data\n");
         
+        // Clear buffer and read from client
         memset(buffer, 0, MAX_BUFFER);
         int bytes_read = read(client_socket, buffer, MAX_BUFFER);
         if (bytes_read < 0) {
             perror("Read failed");
-            close(client_socket);
-            continue;
+            break;
         } else if (bytes_read == 0) {
             printf("Client disconnect\n");
             break;
         }
 
-
+        // DEBUGGING
         printf("Recieving data: %s\n", buffer);
 
+        // Processing the buffer and creating a response
         sscanf(buffer, "%s %s", command, argument);
         if (strcmp(command, "Gap") == 0){
             float distance_now = atof(argument);
@@ -130,12 +134,15 @@ int main(){
             response = "Invalid command";
         }
 
+        // Send the output to the client
         if(send(client_socket, response, strlen(response), 0) < 0){
             perror("Send failed");
         };
     }
+        // Close client if a break happens at input process
         close(client_socket);
     }
-        close(server_socket);
+    // Close server if a break happens somehow
+    close(server_socket);
     return 0;
 }
