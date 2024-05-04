@@ -1,26 +1,70 @@
 #include "actions.c"
-/* Imported:    gap(float distance_now),
-                fuel(float fuel_now),
-                tire(int tire_now),
-                tire_change(char* type_now) */
+/* Imported: gap(float distance_now),
+             fuel(float fuel_now),
+             tire(int tire_now),
+             tire_change(char* type_now) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 /*  
     Soal_3 paddock.c
-    VERSION 2 - tidied up
+    VERSION 4 - log writing
     Amoes Noland 5027231028
 */
 
 // Global definitions
 #define PORT       8080
 #define MAX_BUFFER 1024
+char dir_log[MAX_BUFFER];
+
+// Touch fork function
+void touch(char *item){
+    pid_t pid = fork();
+    if (pid < 0) {
+        printf("Error: Fork failed\n");
+        exit(1);
+    }
+    if (0 == pid){
+        char *cmd = "/usr/bin/touch";
+        char *arg[] = {"touch", item, NULL};
+        execvp(cmd,arg);
+    }
+    else {
+        int status;
+        waitpid(pid, &status, 0);
+    }
+}
+
+// Log function
+void log_write(char* source, char* command, char* argument){
+    FILE *file = fopen(dir_log, "a");
+    if (!file) return; 
+
+    // Set up time variables 
+    time_t timevar; struct tm *timeinfo;
+    time (&timevar); timeinfo = localtime (&timevar);
+
+    // Output into log
+    fprintf(file, "[%s [%02d/%02d/%04d %02d:%02d:%02d]: [%s] [%s]\n",
+            source,
+            timeinfo->tm_mday,
+            timeinfo->tm_mon,
+            timeinfo->tm_year+1900,
+            timeinfo->tm_hour,
+            timeinfo->tm_min,
+            timeinfo->tm_sec,
+            command, argument);
+    fclose(file);
+}
+
 
 // Daemonize the process
 void daemonize(){
@@ -75,9 +119,13 @@ int main(){
     // printf("Server listening on port %d\n", PORT);
 
     // Define work variables
+    int ohio_sigma_skibidi_rizz = 1;
     char command [MAX_BUFFER],
          argument[MAX_BUFFER],
          *response;
+    getcwd(dir_log, sizeof(dir_log));
+    strcat(dir_log, "/server/race.log");
+    touch(dir_log);
 
     // Call daemonize function
     daemonize();
@@ -119,19 +167,25 @@ int main(){
         // Processing the buffer and creating a response
         sscanf(buffer, "%s %s", command, argument);
         if (strcmp(command, "Gap") == 0){
-            float distance_now = atof(argument);
-            response = gap(distance_now);
+            response = gap(atof(argument));
  } else if (strcmp(command, "Fuel") == 0){
-            float fuel_now = atof(argument);
-            response = fuel(fuel_now);
+            response = fuel(atof(argument));
+            strcat(argument, "%");
  } else if (strcmp(command, "Tire") == 0){
-            int tire_now = atoi(argument);
-            response = tire(tire_now);
+            response = tire(atoi(argument));
  } else if (strcmp(command, "TireChange") == 0){
             response = tire_change(argument);
         } else {
+            strcpy(argument, "INVALID COMMAND");
             response = "Invalid command";
+            ohio_sigma_skibidi_rizz = 0;
         }
+
+        // Write results into the log
+        log_write("Driver] ", command, argument);
+        if (ohio_sigma_skibidi_rizz)
+        log_write("Paddock]", command, response);
+        ohio_sigma_skibidi_rizz = 1;
 
         // Send the output to the client
         if(send(client_socket, response, strlen(response), 0) < 0){
