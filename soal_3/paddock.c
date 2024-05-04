@@ -170,6 +170,7 @@ int main(){
             response = gap(atof(argument));
  } else if (strcmp(command, "Fuel") == 0){
             response = fuel(atof(argument));
+            if (!strchr(argument, '%'))
             strcat(argument, "%");
  } else if (strcmp(command, "Tire") == 0){
             response = tire(atoi(argument));
