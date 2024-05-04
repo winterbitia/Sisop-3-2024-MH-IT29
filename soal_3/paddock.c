@@ -41,9 +41,6 @@ void daemonize(){
 
 // Main series of functions
 int main(){
-    // Call daemonize function
-    // daemonize();
-
     // Socket variables
     int server_socket, client_socket;
     struct sockaddr_in server_address, client_address;
@@ -75,13 +72,15 @@ int main(){
     }
 
     // DEBUGGING
-    printf("Server listening on port %d\n", PORT);
+    // printf("Server listening on port %d\n", PORT);
 
     // Define work variables
     char command [MAX_BUFFER],
          argument[MAX_BUFFER],
          *response;
 
+    // Call daemonize function
+    daemonize();
 
     // Main server loop
     while(1){
@@ -141,6 +140,7 @@ int main(){
     }
         // Close client if a break happens at input process
         close(client_socket);
+        sleep(5);
     }
     // Close server if a break happens somehow
     close(server_socket);
