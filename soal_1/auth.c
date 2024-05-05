@@ -3,11 +3,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <dirent.h>
-#include <pthread.h>
 
 /*  
     Soal_1 auth.c
