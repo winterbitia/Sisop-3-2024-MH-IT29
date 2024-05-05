@@ -4,19 +4,45 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <dirent.h>
 #include <pthread.h>
 
 /*  
     Soal_1 auth.c
-    VERSION 1 - deletion only
+    VERSION 2 - shared memory add
     Amoes Noland 5027231028
 */
 
 // Define global variables
-#define MAX_BUFFER 512
-char dir_main[MAX_BUFFER]; 
+#define MAX_BUFFER 1028
 char dir_entry[MAX_BUFFER];
+int keygen = 1001;
+
+// Function to add filename to shared memory
+void dir_csv_share(char* filename){
+    // DEBUGGING
+    printf("key: %d\n", keygen);
+
+    // Generate new shared memory ID
+    key_t key = (key_t)keygen++;
+    int shmid = shmget(key, MAX_BUFFER, IPC_CREAT | 0666);
+
+    // Write into buffer
+    char *shm_buffer = (char*)shmat(shmid, NULL, 0);
+    strcpy(shm_buffer, dir_entry);
+    strcat(shm_buffer, filename);
+
+    // DEBUGGING
+    printf("buf: %s\n", shm_buffer);
+
+    // Detach buffer to prepare next ID
+    shmdt(shm_buffer);
+
+    // DESTROY Shared memory (for testing)
+    // shmctl(shmid, IPC_RMID, NULL);
+}
 
 // Function to delete incorrect files
 void dir_csv_check(){
@@ -26,27 +52,34 @@ void dir_csv_check(){
 
     chdir(dir_entry);
     while(ep = readdir(dir)){
+        // Skips the special items listed
         if ((strcmp(ep->d_name, ".") == 0 )||
             (strcmp(ep->d_name, "..") == 0))
             continue;
         
-        if ((strstr(ep->d_name, "trashcan.csv") == NULL)&&
-            (strstr(ep->d_name, "parkinglot.csv") == NULL))
+        // Deletes incorrect csv files
+        if ((strstr(ep->d_name, "_trashcan.csv") == NULL)&&
+            (strstr(ep->d_name, "_parkinglot.csv") == NULL)){
             remove(ep->d_name);
+            continue;
+        }
+
+        // Add correct csv into shared memory
+        dir_csv_share(ep->d_name);
     }
     closedir(dir);
     return;
 }
 
 int main(){
-    // Get main dir
-    getcwd(dir_main, sizeof(dir_main));
     // Get new entry dir
-    strcpy(dir_entry, dir_main);
+    getcwd(dir_entry, sizeof(dir_entry));
     strcat(dir_entry, "/new-entry/"); 
-    printf("%s\n", dir_entry);    
+    
+    // DEBUGGING
+    printf("dir: %s\n", dir_entry);    
 
-    // Start deletion
+    // Start check
     dir_csv_check();
 
     return 0;
