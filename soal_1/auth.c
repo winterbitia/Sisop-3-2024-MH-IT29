@@ -11,7 +11,7 @@
 
 /*  
     Soal_1 auth.c
-    VERSION 2 - shared memory add
+    VERSION 3 - send max key
     Amoes Noland 5027231028
 */
 
@@ -39,6 +39,26 @@ void dir_csv_share(char* filename){
 
     // Detach buffer to prepare next ID
     shmdt(shm_buffer);
+
+    // DESTROY Shared memory (for testing)
+    // shmctl(shmid, IPC_RMID, NULL);
+}
+
+void keygen_send(){
+    // Generate new shared memory ID
+    key_t key = 1000;
+    int shmid = shmget(key, MAX_BUFFER, IPC_CREAT | 0666);
+
+    // Write into buffer 
+    int *keygen_max;
+    keygen_max = shmat(shmid, NULL, 0);
+    *keygen_max = --keygen;
+
+    // DEBUGGING
+    printf("max: %d\n", *keygen_max);
+
+    // Detach variable
+    shmdt(keygen_max);
 
     // DESTROY Shared memory (for testing)
     // shmctl(shmid, IPC_RMID, NULL);
@@ -81,6 +101,9 @@ int main(){
 
     // Start check
     dir_csv_check();
+
+    // Share csv amount
+    keygen_send();
 
     return 0;
 }
