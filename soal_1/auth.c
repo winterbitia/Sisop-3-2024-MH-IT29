@@ -31,8 +31,7 @@ void dir_csv_share(char* filename){
 
     // Write into buffer
     char *shm_buffer = (char*)shmat(shmid, NULL, 0);
-    strcpy(shm_buffer, dir_entry);
-    strcat(shm_buffer, filename);
+    strcpy(shm_buffer, filename);
 
     // DEBUGGING
     printf("buf: %s\n", shm_buffer);
