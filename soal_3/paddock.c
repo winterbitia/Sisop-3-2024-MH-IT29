@@ -16,7 +16,7 @@
 
 /*  
     Soal_3 paddock.c
-    VERSION 4 - log writing
+    VERSION 5 - touch remove
     Amoes Noland 5027231028
 */
 
@@ -106,7 +106,6 @@ int main(){
          *response;
     getcwd(dir_log, sizeof(dir_log));
     strcat(dir_log, "/server/race.log");
-    touch(dir_log);
 
     // Call daemonize function
     daemonize();
