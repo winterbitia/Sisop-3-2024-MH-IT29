@@ -6,7 +6,7 @@
 
 /*  
     Soal_3 driver.c
-    VERSION 2 - beautiful formatting
+    VERSION 3 - print optimization
     Amoes Noland 5027231028
 */
 
@@ -59,12 +59,12 @@ int main() {
 
     // Initial message
     printf("[CONNECTED TO DRIVER ASSISTANT]\n"); line();
-    printf("Here are the available commands:\n");
-    printf("  Gap        (float)  units\n");
-    printf("  Fuel       (float)  percentage\n");
-    printf("  Tire       (int)    usage\n");
-    printf("  TireChange (string) Soft/Medium\n");
-    printf("  Exit\n"); line();
+    printf("Here are the available commands:\n"
+           "  Gap        (float)  units\n"
+           "  Fuel       (float)  percentage\n"
+           "  Tire       (int)    usage\n"
+           "  TireChange (string) Soft/Medium\n"
+           "  Exit\n"); line();
     printf("~ GOOD LUCK ON THE RACE! ~\n");
 
     while(1){
