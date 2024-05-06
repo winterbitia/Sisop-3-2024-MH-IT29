@@ -75,7 +75,7 @@ int main() {
 
         if (strcmp(buffer, "Exit") == 0){
             printf("Output Driver  : Client exited");
-			close(client_socket);
+            close(client_socket);
             return 0;
         }
 
