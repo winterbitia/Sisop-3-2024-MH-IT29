@@ -9,7 +9,7 @@
 
 /*  
     Soal_1 rate.c
-    VERSION 2 - rating success
+    VERSION 3 - allow read from db
     Amoes Noland 5027231028
 */
 
@@ -50,7 +50,13 @@ void csv_parse(char* filename){
     // Open the selected file
     chdir(dir_entry);
     FILE *file = fopen(filename, "r");
-    if (!file) return;
+
+    // Checks database if not in entry
+    if (!file) {
+        chdir("../microservices/database");
+        file = fopen(filename, "r");
+        if (!file) return;
+    }
 
     // Ignore csv header
     fscanf(file, "%*s");
@@ -101,11 +107,11 @@ void csv_get(){
 }
 
 void rating(char* type, char* fname, char* name, float rating){
-    printf("Type: %s\n"
+    printf("\nType: %s\n"
            "Filename: %s\n"
            "--------------------\n"
            "Name: %s\n"
-           "Rating: %.1f\n\n",
+           "Rating: %.1f\n",
            type, fname, name, rating);
 }
 
