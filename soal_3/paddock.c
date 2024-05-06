@@ -25,24 +25,6 @@
 #define MAX_BUFFER 1024
 char dir_log[MAX_BUFFER];
 
-// Touch fork function
-void touch(char *item){
-    pid_t pid = fork();
-    if (pid < 0) {
-        printf("Error: Fork failed\n");
-        exit(1);
-    }
-    if (0 == pid){
-        char *cmd = "/usr/bin/touch";
-        char *arg[] = {"touch", item, NULL};
-        execvp(cmd,arg);
-    }
-    else {
-        int status;
-        waitpid(pid, &status, 0);
-    }
-}
-
 // Log function
 void log_write(char* source, char* command, char* argument){
     FILE *file = fopen(dir_log, "a");
@@ -64,7 +46,6 @@ void log_write(char* source, char* command, char* argument){
             command, argument);
     fclose(file);
 }
-
 
 // Daemonize the process
 void daemonize(){
