@@ -376,5 +376,364 @@ void csv_log(char* type, char *filename){
 ## Soal 3
 > Dikerjakan oleh: Amoes Noland (5027231028)
 
+Soal ini menerapkan penggunaan socket RPC untuk komunikasi antar proses yang sedang berjalan.
+
+### actions.c
+
+Kode ini hanya berisi fungsi-fungsi yang akan di-include dalam `paddock.c` sehingga bahkan tidak memiliki fungsi main. Fungsi yang ada terdiri atas Gap, Fuel, Tire, dan TireChange.
+
+```c
+char* gap(float distance_now){
+    if (distance_now > 10)
+        return "Stay out of trouble";
+    if (distance_now > 3.5)
+        return "Push";
+        return "Gogogo";
+}
+
+char* fuel(float fuel_now){
+    if (fuel_now > 80)
+        return "Push Push Push";
+    if (fuel_now > 50)
+        return "You can go";
+        return "Conserve Fuel";
+}
+
+char* tire(int tire_now){
+    if (tire_now > 80)
+        return "Go Push Go Push";
+    if (tire_now > 50)
+        return "Good Tire Wear";
+    if (tire_now > 30)
+        return "Conserve Your Tire";
+        return "Box Box Box";
+}
+
+char* tire_change(char* type_now){
+    if (strcmp(type_now, "Soft") == 0)
+        return "Mediums Ready";
+    if (strcmp(type_now, "Medium") == 0)
+        return "Box for Softs";
+}
+```
+
+### paddock.c
+
+Program ini akan menjadi server utama yang berisi seluruh otak dari kasus ini. Program ini akan berjalan sebagai daemon yang terhubung ke proses `driver.c` sebagai hubungan server-client menggunakan socket RPC.
+
+Salah satu poin utama dalam program ini adalah dapat menggunakan fungsi pada `actions.c` karena terletak pada direktori yang sama dengan memanggil satu baris kode ini:
+
+```c
+#include "actions.c"
+```
+Untuk memulai alur kerja `paddock.c` dilakukan konfigurasi server untuk dapat menunggu koneksi dari client sesuai port yang sudah didefinisikan pada variabel global.
+
+```c
+// Global definitions
+#define PORT       8080
+#define MAX_BUFFER 1024
+char dir_log[MAX_BUFFER];
+
+// Main series of functions
+int main(){
+    // Socket variables
+    int server_socket, client_socket;
+    struct sockaddr_in server_address, client_address;
+    int addrlen = sizeof(server_address);
+    char buffer[MAX_BUFFER];
+
+    // Create server socket
+    if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) <= 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configure server address
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = INADDR_ANY;
+    server_address.sin_port = htons(PORT);
+
+    // Bind socket to server
+    if (bind(server_socket, (struct sockaddr *)&server_address,
+                             sizeof(server_address)) < 0) {
+        perror("Bind failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Listen for connection
+    if (listen(server_socket, 3) < 0) {
+        perror("Listen failed");
+        exit(EXIT_FAILURE);
+    }
+```
+
+Proses yang akan dilakukan dalam loop utama memerlukan beberapa variabel seperti satu integer sebagai boolean, berbagai jenis buffer yang akan diproses, serta current working directory untuk mencari lokasi log pada akhir.
+
+```c
+    // Define work variables
+    int ohio_sigma_skibidi_rizz = 1;
+    char command [MAX_BUFFER],
+         argument[MAX_BUFFER],
+         *response;
+    getcwd(dir_log, sizeof(dir_log));
+    strcat(dir_log, "/server/race.log");
+```
+
+Setelah semua persiapan selesai, maka fungsi daemon akan dipanggil untuk mengubah proses menjadi sebuah proses background.
+
+```c
+// Daemonize the process
+void daemonize(){
+    pid_t pid = fork();
+    if (pid < 0) exit(EXIT_FAILURE);
+    if (pid > 0) exit(EXIT_SUCCESS);
+
+    umask(0);
+
+    pid_t sid = setsid();
+    if (sid < 0)        exit(EXIT_FAILURE);
+    if (chdir("/") < 0) exit(EXIT_FAILURE);
+
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+}
+```
+
+Masuk ke dalam fase pertama loop utama, adalah untuk menunggu hubungan dari client.
+
+```c
+// Main server loop
+    while(1){
+        printf("waiting...\n");
+        
+        // Attempt to accept client socket
+        if ((client_socket = accept(server_socket,
+                                (struct sockaddr *)&server_address,
+                                (socklen_t *)&addrlen)) < 0) {
+            perror("Accept failed");
+            continue;
+        }
+
+        while(1){
+            // LOOP PHASE 2
+        }
+        // Close client if a break happens at input process
+        close(client_socket);
+        sleep(5);
+    }
+```
+
+Masuk ke dalam fase kedua dari loop utama, adalah untuk memproses buffer dari client. Fase ini terbagi menjadi beberapa komponen:
+
+1. Clear buffer dan menunggu data dari client
+
+```c
+    // Clear buffer and read from client
+    memset(buffer, 0, MAX_BUFFER);
+    int bytes_read = read(client_socket, buffer, MAX_BUFFER);
+    if (bytes_read < 0) {
+        perror("Read failed");
+        break;
+    } else if (bytes_read == 0) {
+        printf("Client disconnect\n");
+        break;
+    }
+```
+
+2. Memproses buffer dan mencatat respon yang sesuai dengan fungsi yang tertera pada `actions.c`
+
+```c
+    // Processing the buffer and creating a response
+    sscanf(buffer, "%s %s", command, argument);
+    if (strcmp(command, "Gap") == 0){
+        response = gap(atof(argument));
+} else if (strcmp(command, "Fuel") == 0){
+        response = fuel(atof(argument));
+        if (!strchr(argument, '%'))
+        strcat(argument, "%");
+} else if (strcmp(command, "Tire") == 0){
+        response = tire(atoi(argument));
+} else if (strcmp(command, "TireChange") == 0){
+        response = tire_change(argument);
+    } else {
+        strcpy(argument, "INVALID COMMAND");
+        response = "Invalid command";
+        ohio_sigma_skibidi_rizz = 0;
+    }
+```
+
+3. Catat ke dalam log sumber Driver, dan log sumber Paddock hanya bila command yang diinput adalah valid.
+
+```c
+    // Write results into the log
+    log_write("Driver] ", command, argument);
+    if (ohio_sigma_skibidi_rizz)
+    log_write("Paddock]", command, response);
+    ohio_sigma_skibidi_rizz = 1;
+```
+
+Fungsi yang terhubung adalah sebagai berikut, menggunakan localtime untuk mencatat waktu:
+
+```c
+// Log function
+void log_write(char* source, char* command, char* argument){
+    FILE *file = fopen(dir_log, "a");
+    if (!file) return; 
+
+    // Set up time variables 
+    time_t timevar; struct tm *timeinfo;
+    time (&timevar); timeinfo = localtime (&timevar);
+
+    // Output into log
+    fprintf(file, "[%s [%02d/%02d/%04d %02d:%02d:%02d]: [%s] [%s]\n",
+            source,
+            timeinfo->tm_mday,
+            timeinfo->tm_mon,
+            timeinfo->tm_year+1900,
+            timeinfo->tm_hour,
+            timeinfo->tm_min,
+            timeinfo->tm_sec,
+            command, argument);
+    fclose(file);
+}
+```
+
+4. Kirim respon ke client yang terhubung
+
+```c
+    // Send the output to the client
+    if(send(client_socket, response, strlen(response), 0) < 0){
+        perror("Send failed");
+    };
+```
+
+Loop ini akan terus berjalan selama terdapat sebuah koneksi dengan client. Loop ini akan break kembali ke fase pertama bila koneksi terputus dari client. Loop fase pertama hanya dapat berhenti bila daemon diberikan `SIGKILL`.
+
+### driver.c
+
+Program ini akan menjadi client yang menghubungkan command yang diberikan oleh pengguna, untuk meminta respon dari server sesuai yang diminta.
+
+Dimulai dengan konfigurasi socket sesuai IP dan PORT yang didefinisikan pada global variabel.
+
+```c
+// Global definitions
+#define IP         "127.0.0.1"
+#define PORT       8080
+#define MAX_BUFFER 1024
+
+// Main series of functions
+int main() {
+    // Socket variables
+    int client_socket;
+    struct sockaddr_in server_address;
+
+    // Create client socket
+    if ((client_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configure server address
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(PORT);
+
+    // Address conversion for communication
+    if (inet_pton(AF_INET, IP, &server_address.sin_addr) <= 0) {
+        perror("Invalid address/ Address not supported");
+        exit(EXIT_FAILURE);
+    }
+
+    // Connect to server from client
+    if (connect(client_socket, (struct sockaddr *)&server_address,
+                                sizeof(server_address)) < 0) {
+        perror("Connection failed");
+        exit(EXIT_FAILURE);
+    }
+```
+
+Sebelum memasuki loop utama untuk proses input pengguna, terdapat beberapa persiapan yang dilakukan seperti pembuatan variabel buffer dan pesan pertama saat program dibuka.
+
+```c
+// I'm addicted to formatting
+void line(){
+    printf("-------------------------------------\n");
+}
+
+```
+
+```c
+    // Define work variables
+    char buffer[MAX_BUFFER],
+         response[MAX_BUFFER];
+
+    // Initial message
+    printf("[CONNECTED TO DRIVER ASSISTANT]\n"); line();
+    printf("Here are the available commands:\n"
+           "  Gap        (float)  units\n"
+           "  Fuel       (float)  percentage\n"
+           "  Tire       (int)    usage\n"
+           "  TireChange (string) Soft/Medium\n"
+           "  Exit\n"); line();
+    printf("~ GOOD LUCK ON THE RACE! ~\n");
+```
+
+Di dalam loop utama, terdapat beberapa komponen:
+
+1. Clear buffer dan memasukkan input ke dalam buffer, serta mengubah karakter terakhir pada buffer menjadi sebuah null terminator.
+
+```c
+    printf("\nInput Driver   : ");
+    memset(buffer, 0, MAX_BUFFER);
+    fgets(buffer, MAX_BUFFER, stdin);
+    buffer[strcspn(buffer, "\n")] = '\0';
+```
+2. Melakukan handle exit process secara client-side
+
+```c
+    if (strcmp(buffer, "Exit") == 0){
+        printf("Output Driver  : Client exited");
+        close(client_socket);
+        return 0;
+    }
+```
+
+3. Mengirim input ke server yang terhubung
+
+```c
+send(client_socket, buffer, strlen(buffer), 0);
+```
+
+4. Clear respon buffer, dan membaca respon dari server untuk print hasil.
+
+```c
+    memset(response, 0, MAX_BUFFER);
+        
+    int bytes_read = read(client_socket, response, MAX_BUFFER);
+    if (bytes_read < 0) {
+        perror("Read failed");
+        close(client_socket);
+        continue;
+    } else if (bytes_read == 0) {
+        printf("Server disconnect\n");
+        break;
+    }
+
+    printf("Output Paddock : %s\n", response);
+```
+
+Bila terjadi break dari loop karena adanya disconnect dari server, maka akan close di akhir fungsi main.
+
+```c
+    // Close client socket on disconnect
+    close(client_socket);
+    return 0;
+}
+```
+
+#### Dokumentasi Screenshot : 
+
+![driver.c dan paddock.c, serta log](https://media.discordapp.net/attachments/1071478813566976151/1237453298391584869/image.png?ex=663bb3b1&is=663a6231&hm=dbdb65f231a7f011ca365034063c0898e6ec7920f5923fa57ad61402539163dc&=&format=webp&quality=lossless&width=1210&height=681)
+
 ## Soal 4
 > Dikerjakan oleh: Malvin Putra Rismahardian (5027231048)
