@@ -465,7 +465,7 @@ void formatMessage(char *message, const char *operationWord, const char *word1, 
 
 Fungsi utama program (main) untuk mengatur proses parent dan child, serta melakukan operasi matematika sesuai dengan operator yang diberikan. Berikut penjelasan setiap bagian dari fungsi main:
 
-### Parsing Argumen
+#### Parsing Argumen
 Program memeriksa jumlah argumen yang diberikan (4 argumen termasuk nama program, operator, dan dua string angka).
 
 ```c
@@ -475,7 +475,7 @@ if (argc != 4) {
 }
 ```
 
-### Mengonversi String Angka ke Bilangan Bulat
+#### Mengonversi String Angka ke Bilangan Bulat
 Program mengonversi dua string angka (word1 dan word2) ke bilangan bulat (num1 dan num2).
 
 ```c
@@ -485,7 +485,7 @@ int num1 = wordsToNumber(word1);
 int num2 = wordsToNumber(word2);
 ```
 
-### Memeriksa eror
+#### Memeriksa eror
 Jika string angka tidak valid (tidak dapat dikonversi ke bilangan bulat), program memberikan pesan eror.
 
 ```c
@@ -495,7 +495,7 @@ if (num1 == -1 || num2 == -1) {
 }
 ```
 
-### Membuat Pipes
+#### Membuat Pipes
 Program membuat dua pipes (fd1 dan fd2) untuk komunikasi antara proses parent dan child.
 
 ```c
@@ -504,7 +504,7 @@ pipe(fd1);
 pipe(fd2);
 ```
 
-### Fork
+#### Fork
 Program menggunakan fork() untuk membuat proses child.
 
 ```c
@@ -515,7 +515,7 @@ if (pid < 0) {
 }
 ```
 
-### Proses Parent
+#### Proses Parent
 Jika fork berhasil dan pid lebih besar dari 0, maka proses parent dijalankan:
 
 ```c
@@ -634,6 +634,7 @@ exit(EXIT_SUCCESS);
 ![alt text](https://cdn.discordapp.com/attachments/1223171682500350062/1238015603629883463/Screenshot_1766.png?ex=663dbf61&is=663c6de1&hm=9b0dfdeb4b7812f3037283b102e32fd419dbf1683d845ea6ea25198e4c9d1282&)
 ![alt text](https://cdn.discordapp.com/attachments/1223171682500350062/1238015692222234644/Screenshot_1768.png?ex=663dbf76&is=663c6df6&hm=869d26954bebb46d4d381b9e5c398d260e30a16593dfdbbd4e6bcaefc1b6bd91&)
 ![alt text](https://cdn.discordapp.com/attachments/1223171682500350062/1238015642964201515/Screenshot_1767.png?ex=663dbf6a&is=663c6dea&hm=eeed18318b480bbb92af47519bb54b9879f4c6221a3447b7d7677a26d785c0bc&)
+
 
 
 ## Soal 3
