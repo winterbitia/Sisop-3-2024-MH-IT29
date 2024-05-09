@@ -373,6 +373,269 @@ void csv_log(char* type, char *filename){
 ## Soal 2
 > Dikerjakan oleh: Dian Anggraeni Putri (5027231016)
 
+Pada nomor ini, diperintahkan untuk membuat kalkulator perkalian sederhana menggunakan konsep pipes dan fork dalam pemrograman sistem operasi. Kalkulator ini harus dapat melakukan operasi perkalian, penjumlahan, pengurangan, dan pembagian dengan menggunakan argumen pada saat menjalankan program.
+
+Pertama, impor pustaka yang diperlukan.
+
+```c
+#include <stdio.h>  // For standard input/output functions
+#include <stdlib.h> // For memory allocation
+#include <string.h> // For string manipulation functions
+#include <sys/wait.h> // For waiting on child processes (wait, waitpid)
+#include <unistd.h> // For UNIX system functions (fork, pipe)
+#include <time.h> // For time-related functions (time, strftime)
+```
+
+Kedua, definisikan konstanta PIPE_READ (untuk sisi baca pipe) dan PIPE_WRITE (untuk sisi tulis pipe).
+
+```c
+#define PIPE_READ 0
+#define PIPE_WRITE 1
+```
+
+Fungsi wordsToNumber() untuk mengonversi kata-kata angka dalam bahasa Indonesia (satu hingga sembilan) ke bilangan bulat (1 hingga 9).
+```c
+int wordsToNumber(const char *word) {
+    if (strcmp(word, "satu") == 0) return 1;
+    if (strcmp(word, "dua") == 0) return 2;
+    if (strcmp(word, "tiga") == 0) return 3;
+    if (strcmp(word, "empat") == 0) return 4;
+    if (strcmp(word, "lima") == 0) return 5;
+    if (strcmp(word, "enam") == 0) return 6;
+    if (strcmp(word, "tujuh") == 0) return 7;
+    if (strcmp(word, "delapan") == 0) return 8;
+    if (strcmp(word, "sembilan") == 0) return 9;
+    return -1; // Jika input tidak valid, mengembalikan -1
+}
+```
+
+Fungsi numberToWords() untuk mengonversi bilangan bulat (num) ke dalam bentuk kata-kata bahasa Indonesia.
+
+```c
+void numberToWords(int num, char *words) {
+    const char *units[] = {"", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan"};
+    const char *teens[] = {"sepuluh", "sebelas", "dua belas", "tiga belas", "empat belas", "lima belas", "enam belas", "tujuh belas", "delapan belas", "sembilan belas"};
+    const char *tens[] = {"", "", "dua puluh", "tiga puluh", "empat puluh", "lima puluh", "enam puluh", "tujuh puluh", "delapan puluh", "sembilan puluh"};
+
+    if (num < 10) {
+        strcpy(words, units[num]);
+    } else if (num < 20) {
+        strcpy(words, teens[num - 10]);
+    } else {
+        int tenPart = num / 10;
+        int unitPart = num % 10;
+        strcpy(words, tens[tenPart]);
+        if (unitPart > 0) {
+            strcat(words, " ");
+            strcat(words, units[unitPart]);
+        }
+    }
+}
+```
+
+Fungsi writeLog() menulis log ke file histori.log dalam format [date] [type] [message].
+
+```c
+void writeLog(const char *type, const char *message) {
+    FILE *fp = fopen("histori.log", "a");
+    if (fp == NULL) {
+        perror("Error opening file histori.log");
+        exit(EXIT_FAILURE);
+    }
+
+    time_t rawtime;
+    struct tm *timeinfo;
+    char timeStr[30];
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(timeStr, sizeof(timeStr), "%d/%m/%y %H:%M:%S", timeinfo);
+
+    fprintf(fp, "[%s] [%s] %s\n", timeStr, type, message);
+    fclose(fp);
+}
+```
+
+Fungsi formatMessage() untuk membentuk pesan hasil operasi dalam format "hasil [jenis operasi] [word1] dan [word2] adalah [resultWords]".
+
+```c
+void formatMessage(char *message, const char *operationWord, const char *word1, const char *word2, const char *resultWords) {
+    snprintf(message, 100, "hasil %s %s dan %s adalah %s.", operationWord, word1, word2, resultWords);
+}
+```
+
+Fungsi utama program (main) untuk mengatur proses parent dan child, serta melakukan operasi matematika sesuai dengan operator yang diberikan. Berikut penjelasan setiap bagian dari fungsi main:
+
+### Parsing Argumen
+Program memeriksa jumlah argumen yang diberikan (4 argumen termasuk nama program, operator, dan dua string angka).
+
+```c
+if (argc != 4) {
+    printf("Usage: %s [operator] [number1] [number2]\n", argv[0]);
+    return EXIT_FAILURE;
+}
+```
+
+### Mengonversi String Angka ke Bilangan Bulat
+Program mengonversi dua string angka (word1 dan word2) ke bilangan bulat (num1 dan num2).
+
+```c
+const char *word1 = argv[2];
+const char *word2 = argv[3];
+int num1 = wordsToNumber(word1);
+int num2 = wordsToNumber(word2);
+```
+
+### Memeriksa eror
+Jika string angka tidak valid (tidak dapat dikonversi ke bilangan bulat), program memberikan pesan eror.
+
+```c
+if (num1 == -1 || num2 == -1) {
+    printf("ERROR: Invalid number input.\n");
+    return EXIT_FAILURE;
+}
+```
+
+### Membuat Pipes
+Program membuat dua pipes (fd1 dan fd2) untuk komunikasi antara proses parent dan child.
+
+```c
+int fd1[2], fd2[2];
+pipe(fd1);
+pipe(fd2);
+```
+
+### Fork
+Program menggunakan fork() untuk membuat proses child.
+
+```c
+pid_t pid = fork();
+if (pid < 0) {
+    perror("Fork failed");
+    return EXIT_FAILURE;
+}
+```
+
+### Proses Parent
+Jika fork berhasil dan pid lebih besar dari 0, maka proses parent dijalankan:
+
+```c
+if (pid > 0) {
+    // Parent process
+    // Tutup sisi baca dari pipe pertama dan sisi tulis dari pipe kedua.
+    close(fd1[PIPE_READ]);
+    close(fd2[PIPE_WRITE]);
+
+    // Menentukan jenis operasi dan menghitung hasil.
+    char type[10], operationWord[20];
+    if (strcmp(operator, "-kali") == 0) {
+        // Mengalikan num1 dengan num2.
+        result = num1 * num2;
+        strcpy(type, "KALI");
+        strcpy(operationWord, "perkalian");
+    } else if (strcmp(operator, "-tambah") == 0) {
+        // Menjumlahkan num1 dengan num2.
+        result = num1 + num2;
+        strcpy(type, "TAMBAH");
+        strcpy(operationWord, "penjumlahan");
+    } else if (strcmp(operator, "-kurang") == 0) {
+        // Mengurangkan num2 dari num1.
+        result = num1 - num2;
+        strcpy(type, "KURANG");
+        strcpy(operationWord, "pengurangan");
+        // Menangani kasus hasil pengurangan yang negatif.
+        if (result < 0) {
+            printf("ERROR\n");
+            writeLog(type, "ERROR pada pengurangan.");
+            exit(EXIT_SUCCESS);
+        }
+    } else if (strcmp(operator, "-bagi") == 0) {
+        // Membagi num1 dengan num2.
+        if (num2 == 0) {
+            printf("ERROR\n");
+            writeLog("BAGI", "ERROR pada pembagian.");
+            exit(EXIT_SUCCESS);
+        }
+        result = num1 / num2;
+        strcpy(type, "BAGI");
+        strcpy(operationWord, "pembagian");
+    } else {
+        // Operator tidak valid.
+        printf("ERROR: Invalid operator.\n");
+        return EXIT_FAILURE;
+    }
+
+    // Mengirim hasil ke child process melalui pipe.
+    write(fd1[PIPE_WRITE], &result, sizeof(result));
+    close(fd1[PIPE_WRITE]);
+
+    // Membaca pesan dari child process melalui pipe.
+    char buffer[100];
+    read(fd2[PIPE_READ], buffer, sizeof(buffer));
+    close(fd2[PIPE_READ]);
+
+    // Mencetak hasil operasi ke terminal.
+    printf("%s\n", buffer);
+
+    // Menulis hasil operasi ke file log.
+    writeLog(type, buffer);
+
+    // Menunggu proses child selesai.
+    wait(NULL);
+} else {
+```
+
+Proses child bertugas untuk menerima hasil operasi dari parent melalui pipe pertama. Setelah menerima hasil operasi, child mengonversi hasil tersebut ke dalam bentuk kata-kata bahasa Indonesia menggunakan fungsi numberToWords. Kemudian, proses child menentukan jenis operasi yang sesuai dengan operator yang diberikan (-kali, -tambah, -kurang, atau -bagi) dan membentuk pesan hasil operasi dalam format yang diinginkan. Setelah pesan hasil operasi terbentuk, child mengirim pesan tersebut ke parent melalui pipe kedua. Setelah mengirim pesan, proses child menutup pipe yang digunakan dan mengakhiri dirinya dengan sukses.
+
+```c
+// Proses child
+// Tutup sisi tulis dari pipe pertama dan sisi baca dari pipe kedua.
+close(fd1[PIPE_WRITE]);
+close(fd2[PIPE_READ]);
+
+// Membaca hasil operasi dari parent process melalui pipe.
+int result;
+read(fd1[PIPE_READ], &result, sizeof(result));
+close(fd1[PIPE_READ]);
+
+// Mengonversi hasil operasi menjadi kata-kata.
+char resultWords[50];
+numberToWords(result, resultWords);
+
+// Membentuk pesan hasil operasi.
+char message[100];
+char operationWord[20];
+
+// Menentukan jenis operasi untuk menghasilkan pesan.
+if (strcmp(operator, "-kali") == 0) {
+    strcpy(operationWord, "perkalian");
+} else if (strcmp(operator, "-tambah") == 0) {
+    strcpy(operationWord, "penjumlahan");
+} else if (strcmp(operator, "-kurang") == 0) {
+    strcpy(operationWord, "pengurangan");
+} else if (strcmp(operator, "-bagi") == 0) {
+    strcpy(operationWord, "pembagian");
+}
+
+// Membentuk pesan hasil operasi.
+formatMessage(message, operationWord, word1, word2, resultWords);
+
+// Mengirim hasil operasi ke parent process melalui pipe kedua.
+write(fd2[PIPE_WRITE], message, strlen(message) + 1);
+close(fd2[PIPE_WRITE]);
+
+// Mengakhiri proses child
+exit(EXIT_SUCCESS);
+    }
+    return EXIT_SUCCESS; 
+}
+```
+
+#### Screenshot Hasil Pengerjaan
+![alt text](https://cdn.discordapp.com/attachments/1223171682500350062/1238015603629883463/Screenshot_1766.png?ex=663dbf61&is=663c6de1&hm=9b0dfdeb4b7812f3037283b102e32fd419dbf1683d845ea6ea25198e4c9d1282&)
+![alt text](https://cdn.discordapp.com/attachments/1223171682500350062/1238015692222234644/Screenshot_1768.png?ex=663dbf76&is=663c6df6&hm=869d26954bebb46d4d381b9e5c398d260e30a16593dfdbbd4e6bcaefc1b6bd91&)
+![alt text](https://cdn.discordapp.com/attachments/1223171682500350062/1238015642964201515/Screenshot_1767.png?ex=663dbf6a&is=663c6dea&hm=eeed18318b480bbb92af47519bb54b9879f4c6221a3447b7d7677a26d785c0bc&)
+
+
 ## Soal 3
 > Dikerjakan oleh: Amoes Noland (5027231028)
 
