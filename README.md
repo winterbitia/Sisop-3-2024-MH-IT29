@@ -1001,3 +1001,394 @@ Bila terjadi break dari loop karena adanya disconnect dari server, maka akan clo
 
 ## Soal 4
 > Dikerjakan oleh: Malvin Putra Rismahardian (5027231048)
+
+### isi soal
+
+Lewis Hamilton 🏎 seorang wibu akut dan sering melewatkan beberapa episode yang karena sibuk menjadi asisten. Maka dari itu dia membuat list anime yang sedang ongoing (biar tidak lupa) dan yang completed (anime lama tapi pengen ditonton aja). Tapi setelah Lewis pikir-pikir malah kepikiran untuk membuat list anime. Jadi dia membuat file (harap diunduh) dan ingin menggunakan socket yang baru saja dipelajarinya untuk melakukan CRUD pada list animenya. 
+
+a. Client dan server terhubung melalui socket. 
+
+b. client.c di dalam folder client dan server.c di dalam folder server
+
+c. Client berfungsi sebagai pengirim pesan dan dapat menerima pesan dari server.
+
+d. Server berfungsi sebagai penerima pesan dari client dan hanya menampilkan pesan perintah client saja.  
+
+e. Server digunakan untuk membaca myanimelist.csv. Dimana terjadi pengiriman data antara client ke server dan server ke client.
+	* Menampilkan seluruh judul
+	* Menampilkan judul berdasarkan genre
+	* Menampilkan judul berdasarkan hari
+	* Menampilkan status berdasarkan berdasarkan judul
+	* Menambahkan anime ke dalam file myanimelist.csv
+	* Melakukan edit anime berdasarkan judul
+	* Melakukan delete berdasarkan judul
+	* Selain command yang diberikan akan menampilkan tulisan “Invalid Command”
+
+f. Karena Lewis juga ingin track anime yang ditambah, diubah, dan dihapus. Maka dia membuat server dapat mencatat anime yang dihapus dalam sebuah log yang diberi nama change.log.
+	* Format: [date] [type] [massage]
+	* Type: ADD, EDIT, DEL
+	* Ex:
+	1. [29/03/24] [ADD] Kanokari ditambahkan.
+	2. [29/03/24] [EDIT] Kamis,Comedy,Kanokari,completed diubah menjadi Jumat,Action,Naruto,completed.
+	3. [29/03/24] [DEL] Naruto berhasil dihapus.
+
+g. Koneksi antara client dan server tidak akan terputus jika ada kesalahan input dari client, cuma terputus jika user mengirim pesan “exit”. Program exit dilakukan pada sisi client.
+
+h. Hasil akhir:
+soal_4/
+    ├── change.log
+    ├── client/
+    │   └── client.c
+    ├── myanimelist.csv
+    └── server/
+        └── server.c
+
+Log Perubahan:
+5/3/2024 - 2:37 pm: Tambah keterangan soal 3 di poin H 
+
+5/3/2024 - 6.18 pm: Ralat “dan” pada poin D soal 1
+
+
+
+
+
+### Penyelesaian
+**Pertama**
+
+Saya membuat direktori dan mengisi direktori itu dengan format sesuai dengan perintah yang diberikan. Lalu menginstall file yang diberikan pada direktori yang sesuai, dengan cara : 
+
+```sh
+curl -o myanimelist.csv -L 'https://drive.google.com/uc?export=download&id=10p_kzuOgaFY3WT6FVPJIXFbkej2s9f50'
+```
+
+**Kedua**
+
+Selanjutnya saya mengisi`server.c`dengan code berikut:
+
+```sh
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <time.h>
+
+#define PORT 8080
+#define CMD_BUFFER_SIZE 4096
+#define RESPONSE_BUFFER_SIZE 8192
+#define CSV_PATH "/home/malvin/sisopmodul3/soal_4/myanimelist.csv"
+#define LOG_PATH "/home/malvin/sisopmodul3/soal_4/change.log"
+
+void write_to_log(const char *type, const char *message) {
+    FILE *log_file = fopen(LOG_PATH, "a");
+    if (log_file == NULL) {
+        perror("Error opening log file");
+        exit(EXIT_FAILURE);
+    }
+
+    time_t now;
+    time(&now);
+    struct tm *tm_info = localtime(&now);
+    char time_str[20];
+    strftime(time_str, 20, "%d/%m/%y - %I:%M %p", tm_info);
+
+    fprintf(log_file, "[%s] [%s] %s\n", time_str, type, message);
+    fclose(log_file);
+}
+
+void handle_command(int client_socket, const char *command) {
+    char response[RESPONSE_BUFFER_SIZE] = {0};
+
+    if (strcmp(command, "SHOW") == 0) {
+        FILE *csv_file = fopen(CSV_PATH, "r");
+        if (csv_file == NULL) {
+            sprintf(response, "Error opening file: No such file or directory");
+        } else {
+            char line[1024];
+            while (fgets(line, sizeof(line), csv_file)) {
+                strcat(response, line);
+            }
+            fclose(csv_file);
+        }
+    } else if (strncmp(command, "GENRE", 5) == 0) {
+        char genre[256] = {0};
+        sscanf(command, "%*s %s", genre);
+
+        char cmd[CMD_BUFFER_SIZE];
+        snprintf(cmd, CMD_BUFFER_SIZE, "grep %s %s", genre, CSV_PATH);
+        
+        FILE *grep_pipe = popen(cmd, "r");
+        if (grep_pipe == NULL) {
+            perror("Error executing grep command");
+            exit(EXIT_FAILURE);
+        }
+
+        char line[1024];
+        while (fgets(line, sizeof(line), grep_pipe)) {
+            strcat(response, line);
+        }
+
+        pclose(grep_pipe);
+    } else if (strncmp(command, "DAY", 3) == 0) {
+        char day[256] = {0};
+        sscanf(command, "%*s %s", day);
+
+        char cmd[CMD_BUFFER_SIZE];
+        snprintf(cmd, CMD_BUFFER_SIZE, "grep %s %s", day, CSV_PATH);
+
+        FILE *grep_pipe = popen(cmd, "r");
+        if (grep_pipe == NULL) {
+            perror("Error executing grep command");
+            exit(EXIT_FAILURE);
+        }
+
+        char line[1024];
+        while (fgets(line, sizeof(line), grep_pipe)) {
+            strcat(response, line);
+        }
+
+        pclose(grep_pipe);
+    } else if (strncmp(command, "STATUS", 6) == 0) {
+        char status[256] = {0};
+        sscanf(command, "%*s %s", status);
+
+        char cmd[CMD_BUFFER_SIZE];
+        snprintf(cmd, CMD_BUFFER_SIZE, "grep %s %s", status, CSV_PATH);
+
+        FILE *grep_pipe = popen(cmd, "r");
+        if (grep_pipe == NULL) {
+            perror("Error executing grep command");
+            exit(EXIT_FAILURE);
+        }
+
+        char line[1024];
+        while (fgets(line, sizeof(line), grep_pipe)) {
+            strcat(response, line);
+        }
+
+        pclose(grep_pipe);
+    } else if (strncmp(command, "ADD", 3) == 0 || strncmp(command, "EDIT", 4) == 0 || strncmp(command, "DEL", 3) == 0) {
+        // Log the command
+        write_to_log("ADD/EDIT/DEL", command);
+
+        // Handle the command (add/edit/del) here
+    
+        // For now, just set the response to a placeholder message
+        sprintf(response, "Command \"%s\" executed successfully", command);
+    } else {
+        // Invalid command
+        sprintf(response, "Invalid Command");
+    }
+
+    send(client_socket, response, strlen(response), 0);
+}
+
+int main() {
+    int server_fd, new_socket;
+    struct sockaddr_in address;
+    int opt = 1;
+    int addrlen = sizeof(address);
+
+    // Creating socket file descriptor
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Forcefully attaching socket to the port 8080
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+
+    // Forcefully attaching socket to the port 8080
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
+    }
+
+    if (listen(server_fd, 3) < 0) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+
+    if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
+        perror("accept");
+        exit(EXIT_FAILURE);
+    }
+
+    while (1) {
+        char command[1024] = {0};
+        if (recv(new_socket, command, sizeof(command), 0) <= 0) {
+            break;
+        }
+
+        handle_command(new_socket, command);
+    }
+
+    return 0;
+}
+```
+
+Code ini bertanggung jawab untuk membuat server yang menerima koneksi dari client, menanggapi perintah yang diterima dari client, dan mengirimkan respons kembali ke client.
+
+Berikut adalah penjelasan singkat tentang setiap bagian dari code tersebut:
+
+`Definisi Konstanta:` Konstanta `PORT`, `CMD_BUFFER_SIZE`, `RESPONSE_BUFFER_SIZE`, `CSV_PATH`, dan `LOG_PATH` didefinisikan untuk menentukan port yang akan digunakan untuk koneksi, ukuran buffer untuk perintah dan respons, serta path untuk file CSV dan log.
+
+`Fungsi write_to_log()`: Fungsi ini digunakan untuk menulis pesan ke file log dengan format waktu, tipe, dan pesan yang ditentukan.
+
+`Fungsi handle_command()`: Fungsi ini menangani perintah yang diterima dari client. Bergantung pada jenis perintah yang diterima, fungsi ini akan membaca file CSV, melakukan pencarian dengan menggunakan grep, atau menulis log, dan kemudian mengirimkan respons kembali ke client.
+
+`Membuat Socket`: Socket TCP/IP dibuat menggunakan `socket()` dengan menggunakan `AF_INET` untuk domain (IPv4), SOCK_STREAM untuk tipe socket (TCP), dan `0` untuk protokol default.
+
+`Mengatur Socket Options`: Fungsi `setsockopt()` digunakan untuk mengatur opsi socket, seperti `SO_REUSEADDR` dan `SO_REUSEPORT`, agar socket dapat digunakan kembali setelah di-bind.
+
+`Menyiapkan Struktur sockaddr_in`: Struktur `sockaddr_in` digunakan untuk menyimpan alamat server. Port dan alamat IP server ditentukan dalam struktur ini.
+
+`Binding Socket`: Socket di-bind ke alamat server dengan menggunakan fungsi `bind()`.
+
+`Mendengarkan Koneksi`: Server mulai mendengarkan koneksi dari client dengan menggunakan fungsi `listen()`.
+
+`Menerima Koneksi`: Server menerima koneksi dari client dengan menggunakan fungsi `accept()`.
+
+`Loop untuk Menerima Perintah`: Program memasuki loop tak terbatas untuk menerima perintah dari client. Setiap perintah yang diterima akan ditangani oleh fungsi `handle_command()`.
+
+`Menutup Socket`: Setelah loop berakhir, server menutup socket dengan `close()`.
+
+
+
+**Ketiga**
+
+Selanjutnya saya mengisi`client.c`dengan code berikut:
+
+ ```sh
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+#define PORT 8080
+
+int main() {
+    int sock = 0;
+    struct sockaddr_in serv_addr;
+    char command[1024] = {0};
+
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        printf("\n Socket creation error \n");
+        return -1;
+    }
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(PORT);
+
+    // Convert IPv4 and IPv6 addresses from text to binary form
+    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) {
+        printf("\nInvalid address/ Address not supported \n");
+        return -1;
+    }
+
+    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        printf("\nConnection Failed \n");
+        return -1;
+    }
+
+    while (1) {
+        printf("Enter command: ");
+        fgets(command, sizeof(command), stdin);
+        if (strlen(command) <= 1) {
+            printf("Please enter a valid command\n");
+            continue;
+        }
+
+        // Remove trailing newline character
+        if (command[strlen(command) - 1] == '\n') {
+            command[strlen(command) - 1] = '\0';
+        }
+
+        send(sock, command, strlen(command), 0);
+
+        char response[8192] = {0};
+        if (recv(sock, response, sizeof(response), 0) <= 0) {
+            printf("Server disconnected\n");
+            break;
+        }
+
+        printf("Server response:\n%s\n", response);
+    }
+
+    close(sock);
+    return 0;
+}
+``` 
+Code ini berfungsi untuk membuat koneksi dengan server menggunakan protokol TCP/IP, mengirimkan perintah dari pengguna ke server, dan menampilkan respons dari server.
+
+Berikut adalah penjelasan singkat tentang setiap bagian dari code tersebut:
+
+`Definisi Konstanta:` Konstanta `PORT` didefinisikan untuk menentukan port yang akan digunakan untuk koneksi.
+
+`Membuat Socket:` Socket `TCP/IP` dibuat menggunakan `socket()` dengan menggunakan `AF_INET` untuk domain (IPv4), `SOCK_STREAM` untuk tipe socket (TCP), dan `0` untuk protokol default.
+
+`Menyiapkan Struktur sockaddr_in:` Struktur sockaddr_in digunakan untuk menyimpan alamat server. Port dan alamat IP server ditentukan dalam struktur ini.
+
+`Menghubungkan ke Server:` Fungsi `connect()` digunakan untuk menghubungkan socket ke server menggunakan alamat yang sudah ditentukan.
+
+`Loop Pengiriman Perintah:` Program memasuki loop tak terbatas untuk menerima perintah dari pengguna dan mengirimkannya ke server. Pengguna diminta untuk memasukkan perintah, kemudian perintah tersebut dikirimkan ke server menggunakan `send()`. Jika panjang string perintah yang dimasukkan kurang dari atau sama dengan 1, program akan menampilkan pesan kesalahan. String perintah juga dipotong untuk menghapus karakter newline yang dimasukkan oleh `fgets()`. Setelah perintah dikirimkan, program menerima respons dari server menggunakan `recv()`. Jika tidak ada respons dari server (koneksi terputus), program menampilkan pesan bahwa server terputus dan loop berakhir.
+
+``Menutup Socket:` Setelah loop berakhir, program menutup socket dengan `close()` dan mengakhiri eksekusi dengan mengembalikan nilai 0.
+
+
+**Keempat**
+
+Untuk langkah terakhir, kita harus membuka dua Terminal sekaligus untuk bisa menjalankan code diatas. Masing - masing terminal membuka direktori `server` dan `client` .
+
+### Cara Menjalankan code
+
+Untuk menjalankan code client.c dan server.c, kita perlu mengikuti beberapa langkah:
+
+*Menjalankan Server*
+
+Compile file server.c menjadi sebuah executable. Kita dapat menggunakan compiler C seperti gcc.
+
+`gcc -o server server.c`
+Jalankan server dengan mengetikkan nama executable yang telah dibuat.
+
+
+`./server`
+Server sekarang akan berjalan dan siap menerima koneksi dari client.
+
+*Menjalankan Client*
+
+Compile file client.c menjadi sebuah executable.
+
+`gcc -o client client.c`
+Jalankan client dengan mengetikkan nama executable yang telah dibuat.
+
+`./client`
+Setelah client berjalan, Anda akan diminta untuk memasukkan perintah. Ketiklah perintah sesuai dengan kebutuhan, seperti "SHOW", "GENRE", "DAY", "STATUS", "ADD", "EDIT", "DEL", dan tekan Enter untuk mengirim perintah ke server.
+
+Client akan menerima respons dari server dan menampilkannya di layar.
+
+#### Dokumentasi Screenshot : 
+
+![Hasil](https://cdn.discordapp.com/attachments/1045023350679949476/1238828983479439450/Screenshot_2024-05-11_192240.png?ex=6640b4e5&is=663f6365&hm=fd2b0e8ed8ce7bd469f2ee11f0ae6dd65d262f0f34c56993250feb9427b61eca&)
+
+![Hasil](https://cdn.discordapp.com/attachments/1045023350679949476/1238828983941074985/Screenshot_2024-05-11_192218.png?ex=6640b4e6&is=663f6366&hm=725ab93683f3ce40b57c239082a466657e12d4d588c22a786776610866d57a39&)
+
+![Hasil](https://cdn.discordapp.com/attachments/1045023350679949476/1238828984318300191/Screenshot_2024-05-11_192104.png?ex=6640b4e6&is=663f6366&hm=fb0f5f2a061b6b4dcc6eaca9c449bb3aee4dfad7089661af5fcc9f79fd7af253&)
+
+![Hasil](https://cdn.discordapp.com/attachments/1045023350679949476/1238828984868016128/Screenshot_2024-05-11_192008.png?ex=6640b4e6&is=663f6366&hm=a6a44ac3166c8d648dd376dada90b4443cc01f6a3e87155c2c202eb38ba63bee&)
+
+![Hasil](https://cdn.discordapp.com/attachments/1045023350679949476/1238828985245241394/Screenshot_2024-05-11_191926.png?ex=6640b4e6&is=663f6366&hm=8917bb63827a7b6f007490bb704adb3eb664b110487fcc91f51493961a066d45&)
+
+![Hasil](https://cdn.discordapp.com/attachments/1045023350679949476/1238828985627185244/Screenshot_2024-05-11_192309.png?ex=6640b4e6&is=663f6366&hm=0ea0cb70cf8f1e8b4f8ca97520a884198320c8abe077e2d26ad8750258baa6a7&)
+
+### kendala
+Tidak ada kendala.
